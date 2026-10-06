@@ -117,7 +117,7 @@ npm run scale:smoke
 npm run build
 ```
 
-If a restricted container prevents Turbopack from starting its internal CSS worker, the equivalent verification command is `npx next build --webpack`.
+`npm run build` uses Webpack because the hosting build environment fails to start Turbopack's internal CSS worker. Keep the hosting build command as `npm run build` and the output directory as `.next`. Local development continues to use Turbopack through `npm run dev`.
 
 ## Architecture
 

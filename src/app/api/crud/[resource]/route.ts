@@ -1,26 +1,22 @@
 import { z } from "zod";
+import { readRequestBytes, RequestBodyTooLargeError } from "@/lib/request-body";
 
 import { createCrudRecord, deleteCrudRecord, listCrudRecords, reconcileCrudRelations, supportsCrudResource, updateCrudRecord } from "@/lib/crud-server";
 import { db } from "@/lib/db";
 import { requireApiSession } from "@/lib/dal";
 import { notifyCrudMutation } from "@/lib/notifications";
 import { runCrudWorkflows } from "@/lib/workflow-engine";
+import { canReadResource, canWriteResource } from "@/lib/permissions";
 
 const mutationSchema = z.object({
   id: z.string().min(1).max(191).optional(),
   data: z.record(z.string(), z.unknown()).optional(),
   records: z.array(z.record(z.string(), z.unknown())).min(1).max(50).optional(),
 });
-const memberWritableResources = new Set(["tasks", "calendar-events", "time-entries", "documents", "activities", "knowledge"]);
 const maximumRequestBytes = 8 * 1024 * 1024;
 
-class RequestBodyTooLargeError extends Error {}
 
 export const maxDuration = 60;
-
-function canWriteResource(role: string, resource: string) {
-  return role === "owner" || role === "admin" || memberWritableResources.has(resource);
-}
 
 function safeErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "The record could not be saved.";
@@ -43,31 +39,7 @@ function errorResponse(error: unknown) {
 }
 
 async function requestBody(request: Request) {
-  const declared = Number(request.headers.get("content-length") || 0);
-  if (declared > maximumRequestBytes) throw new RequestBodyTooLargeError("Request body exceeds the 8 MB limit.");
-  if (!request.body) return null;
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let received = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    received += value.byteLength;
-    if (received > maximumRequestBytes) {
-      await reader.cancel();
-      throw new RequestBodyTooLargeError("Request body exceeds the 8 MB limit.");
-    }
-    chunks.push(value);
-  }
-
-  const bytes = new Uint8Array(received);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  const source = new TextDecoder().decode(bytes);
+  const source = new TextDecoder().decode(await readRequestBytes(request, maximumRequestBytes));
   try {
     return JSON.parse(source) as unknown;
   } catch {
@@ -80,6 +52,8 @@ async function contextFor(request: Request, context: RouteContext<"/api/crud/[re
   if (!session) return { response: Response.json({ error: "Unauthorized" }, { status: 401 }) };
   const { resource } = await context.params;
   if (!supportsCrudResource(resource)) return { response: Response.json({ error: "Unsupported resource" }, { status: 404 }) };
+  const leadLookup = request.method === "GET" && new URL(request.url).searchParams.get("lookup") === "1" && resource === "leads" && session.role === "member";
+  if (!canReadResource(session.role, resource) && !leadLookup) return { response: Response.json({ error: "Your workspace role cannot access this business area." }, { status: 403 }) };
   return { session, resource };
 }
 
@@ -89,11 +63,12 @@ export async function GET(request: Request, context: RouteContext<"/api/crud/[re
   try {
     const url = new URL(request.url);
     const requestedLimit = Number(url.searchParams.get("limit") || 50);
-    const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(10, requestedLimit)) : 50;
+    const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(10, Math.floor(requestedLimit))) : 50;
     const result = await listCrudRecords(resolved.resource, resolved.session.organizationId, {
       limit,
       cursor: url.searchParams.get("cursor"),
       query: url.searchParams.get("q"),
+      lookup: url.searchParams.get("lookup") === "1",
     });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

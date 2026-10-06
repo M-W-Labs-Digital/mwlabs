@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireApiSession } from "@/lib/dal";
 import { notifyCrudMutation } from "@/lib/notifications";
+import { canWriteResource } from "@/lib/permissions";
 
 const createLeadSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -15,6 +16,7 @@ const createLeadSchema = z.object({
 export async function POST(request: Request) {
   const session = await requireApiSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canWriteResource(session.role, "leads")) return Response.json({ error: "Your workspace role cannot create leads." }, { status: 403 });
 
   const parsed = createLeadSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

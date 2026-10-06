@@ -1,11 +1,13 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { isWorkspaceAdmin } from "@/lib/permissions";
 
-export async function getAgencyContext(organizationId: string) {
+export async function getAgencyContext(organizationId: string, role: string) {
+  const admin = isWorkspaceAdmin(role);
   const [leads, projects, tasks, invoices, knowledge, automations, upcomingMeetings] = await Promise.all([
     db.lead.findMany({
-      where: { organizationId },
+      where: { organizationId, ...(!admin ? { id: { in: [] } } : {}) },
       orderBy: { score: "desc" },
       take: 10,
       select: { company: true, stage: true, value: true, probability: true, score: true, nextActivityAt: true },
@@ -22,7 +24,7 @@ export async function getAgencyContext(organizationId: string) {
       select: { title: true, status: true, priority: true, dueDate: true, project: { select: { code: true } } },
     }),
     db.invoice.findMany({
-      where: { organizationId },
+      where: { organizationId, ...(!admin ? { id: { in: [] } } : {}) },
       take: 12,
       orderBy: { createdAt: "desc" },
       select: { number: true, status: true, total: true, dueDate: true, client: { select: { company: true } } },
@@ -34,7 +36,8 @@ export async function getAgencyContext(organizationId: string) {
       select: { title: true, content: true, source: true, tags: true },
     }),
     db.automation.findMany({
-      where: { organizationId, enabled: true },
+      where: { organizationId, enabled: true, ...(!admin ? { id: { in: [] } } : {}) },
+      take: 20,
       select: { name: true, trigger: true, action: true },
     }),
     db.calendarEvent.findMany({

@@ -1,9 +1,11 @@
 import { db } from "@/lib/db";
 import { requireApiSession } from "@/lib/dal";
+import { isWorkspaceAdmin } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   const session = await requireApiSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const invitationScope = { organizationId: session.organizationId, status: "pending", ...(!isWorkspaceAdmin(session.role) ? { id: { in: [] as string[] } } : {}) };
 
   const [members, invitations, teams, memberTotal, invitationTotal, teamTotal] = await Promise.all([
     db.member.findMany({
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
       },
     }),
     db.invitation.findMany({
-      where: { organizationId: session.organizationId, status: "pending" },
+      where: invitationScope,
       orderBy: { createdAt: "desc" },
       take: 100,
       select: { id: true, email: true, role: true, status: true, expiresAt: true, createdAt: true },
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
       },
     }),
     db.member.count({ where: { organizationId: session.organizationId } }),
-    db.invitation.count({ where: { organizationId: session.organizationId, status: "pending" } }),
+    db.invitation.count({ where: invitationScope }),
     db.team.count({ where: { organizationId: session.organizationId } }),
   ]);
 

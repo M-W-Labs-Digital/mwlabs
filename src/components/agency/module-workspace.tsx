@@ -484,7 +484,7 @@ export function ModuleWorkspace({ moduleKey, config, role }: { moduleKey: string
     const controller = new AbortController();
     const resources = Array.from(new Set(crud.fields.map((field) => field.relationResource).filter((resource): resource is string => Boolean(resource))));
     async function loadRelations() {
-      const responses = await Promise.all(resources.map((resource) => fetch(resource === "members" ? "/api/team" : `/api/crud/${resource}?limit=100`, { signal: controller.signal })));
+      const responses = await Promise.all(resources.map((resource) => fetch(resource === "members" ? "/api/team" : `/api/crud/${resource}?limit=100&lookup=1`, { signal: controller.signal })));
       const results = await Promise.all(responses.map(async (response) => response.ok ? response.json() : { records: [] }));
       if (!active) return;
       setRelations(Object.fromEntries(resources.map((resource, index) => {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 import { assessPublicSubmission } from "@/lib/anti-spam";
 import { getAuthSessionFromHeaders, hasTrustedMutationOrigin } from "@/lib/dal";
@@ -19,7 +20,7 @@ import {
 
 export const runtime = "nodejs";
 
-const visitors = new Map<string, { count: number; resetAt: number }>();
+const visitorRateLimit = createRateLimiter();
 const bookingSchema = z.object({
   bookingTypeId: z.string().min(1).max(191),
   startAt: z.string().datetime(),
@@ -36,16 +37,7 @@ const bookingSchema = z.object({
 
 function withinRateLimit(request: Request, bucket: "availability" | "booking", limit: number) {
   const address = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
-  const key = `${bucket}:${address}`;
-  const now = Date.now();
-  const current = visitors.get(key);
-  if (!current || current.resetAt < now) {
-    visitors.set(key, { count: 1, resetAt: now + 60 * 60 * 1_000 });
-    return true;
-  }
-  if (current.count >= limit) return false;
-  current.count += 1;
-  return true;
+  return visitorRateLimit(`${bucket}:${address}`, limit, 60 * 60 * 1_000);
 }
 
 function safeError(error: unknown) {
@@ -99,7 +91,7 @@ export async function POST(request: Request) {
   const parsed = bookingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid booking details." }, { status: 400 });
   if (!isValidTimezone(parsed.data.timezone)) return Response.json({ error: "Select a valid timezone." }, { status: 400 });
-  const spam = assessPublicSubmission(request, { email: parsed.data.email, name: parsed.data.name, message: parsed.data.notes, honeypot: parsed.data.website, formStartedAt: parsed.data.formStartedAt }, { bucket: "booking", limit: 8, duplicateWindowMs: 30 * 60 * 1_000 });
+  const spam = assessPublicSubmission(request, { email: parsed.data.email, name: parsed.data.name, message: `${parsed.data.bookingTypeId}:${parsed.data.startAt}:${parsed.data.notes}`, honeypot: parsed.data.website, formStartedAt: parsed.data.formStartedAt }, { bucket: "booking", limit: 8, duplicateWindowMs: 30 * 60 * 1_000 });
   if (!spam.allowed) return spam.error ? Response.json({ error: spam.error }, { status: spam.status }) : Response.json({ received: true }, { status: spam.status });
 
   try {
@@ -226,6 +218,7 @@ export async function POST(request: Request) {
       return created;
     });
 
+    spam.commit?.();
     const managePath = createBookingManagePath(event.id);
     const bookingToken = new URL(managePath, "https://mwlabs.digital").searchParams.get("booking");
     const meetingTime = new Intl.DateTimeFormat("en-GB", {

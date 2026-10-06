@@ -101,6 +101,8 @@ export const getWorkspaceContext = cache(async () => {
     };
   }
 
+  if (!["owner", "admin", "member"].includes(membership.role)) redirect("/sign-in");
+
   return {
     user: {
       id: session.userId,
@@ -114,20 +116,25 @@ export const getWorkspaceContext = cache(async () => {
 });
 
 export const getCustomerDashboardData = cache(async (userId: string) => {
-  const [requests, client] = await Promise.all([
-    db.lead.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 20, select: { id: true, company: true, stage: true, value: true, createdAt: true } }),
-    db.client.findFirst({ where: { userId }, select: { projects: { orderBy: { updatedAt: "desc" }, take: 8, select: { id: true, name: true, code: true, status: true, progress: true, budget: true, spent: true, dueDate: true, client: { select: { company: true } } } }, invoices: { orderBy: { createdAt: "desc" }, take: 8, select: { id: true, number: true, status: true, total: true, dueDate: true, client: { select: { company: true } } } } } }),
+  const context = await getWorkspaceContext();
+  if (context.role !== "customer" || context.user.id !== userId) redirect("/app");
+  const organizationId = context.organization.id;
+  const invoiceScope = { organizationId, client: { userId, user: { emailVerified: true } } };
+  const projectScope = { organizationId, client: { userId, user: { emailVerified: true } }, status: { notIn: ["Complete", "Archived"] } };
+  const [requests, pipeline, projects, activeProjects, paid, outstanding] = await Promise.all([
+    db.lead.findMany({ where: { userId, organizationId }, orderBy: { createdAt: "desc" }, take: 4, select: { id: true, company: true, stage: true } }),
+    db.lead.groupBy({ by: ["stage"], where: { userId, organizationId }, _sum: { value: true }, _count: { _all: true } }),
+    db.project.findMany({ where: projectScope, orderBy: { updatedAt: "desc" }, take: 8, select: { id: true, name: true, code: true, status: true, progress: true, budget: true, spent: true, dueDate: true, client: { select: { company: true } } } }),
+    db.project.count({ where: projectScope }),
+    db.invoice.aggregate({ where: { ...invoiceScope, status: "Paid" }, _sum: { total: true } }),
+    db.invoice.aggregate({ where: { ...invoiceScope, status: { in: ["Sent", "Overdue"] } }, _sum: { total: true } }),
   ]);
-  const projects = client?.projects ?? [];
-  const invoices = client?.invoices ?? [];
-  const paidRevenue = invoices.filter((invoice) => invoice.status === "Paid").reduce((sum, invoice) => sum + Number(invoice.total), 0);
-  const receivables = invoices.filter((invoice) => ["Sent", "Overdue"].includes(invoice.status)).reduce((sum, invoice) => sum + Number(invoice.total), 0);
   return {
     asOf: new Date().toISOString(),
-    metrics: { weightedPipeline: requests.reduce((sum, request) => sum + Number(request.value), 0), paidRevenue, receivables, grossMargin: 0, activeClients: client ? 1 : 0, activeProjects: projects.filter((project) => !["Complete", "Archived"].includes(project.status)).length },
-    pipelineByStage: requests.map((request) => ({ stage: request.stage, count: 1, value: Number(request.value) })),
+    metrics: { weightedPipeline: pipeline.reduce((sum, stage) => sum + Number(stage._sum.value ?? 0), 0), paidRevenue: Number(paid._sum.total ?? 0), receivables: Number(outstanding._sum.total ?? 0), grossMargin: 0, activeClients: 0, activeProjects },
+    pipelineByStage: pipeline.map((stage) => ({ stage: stage.stage, count: stage._count._all, value: Number(stage._sum.value ?? 0) })),
     revenueSeries: [],
-    signals: requests.slice(0, 4).map((request) => ({ title: request.company, message: `Request status: ${request.stage}.`, href: "/app", tone: "neutral" })),
+    signals: requests.map((request) => ({ title: `${request.company} · ${request.id.slice(-6)}`, message: `Request status: ${request.stage}.`, href: "/app", tone: "neutral" })),
     projects: projects.map((project) => ({ ...project, budget: Number(project.budget), spent: Number(project.spent), dueDate: project.dueDate?.toISOString() ?? null })),
     tasks: [],
   };
@@ -155,7 +162,7 @@ export async function requireApiSession(request: Request) {
     select: { organizationId: true, role: true },
   });
 
-  if (!membership) return null;
+  if (!membership || !["owner", "admin", "member"].includes(membership.role)) return null;
   return {
     userId: session.user.id,
     organizationId: membership.organizationId,
@@ -163,9 +170,27 @@ export async function requireApiSession(request: Request) {
   };
 }
 
+async function getMemberDashboardData(organizationId: string) {
+  const [projects, tasks, activeProjects, activeClients] = await Promise.all([
+    db.project.findMany({ where: { organizationId, status: { notIn: ["Complete", "Archived"] } }, take: 8, orderBy: { dueDate: "asc" }, select: { id: true, name: true, code: true, status: true, progress: true, budget: true, spent: true, dueDate: true, client: { select: { company: true } } } }),
+    db.task.findMany({ where: { organizationId, status: { not: "Done" } }, take: 20, orderBy: { dueDate: "asc" }, select: { id: true, title: true, priority: true, status: true, dueDate: true, project: { select: { code: true } } } }),
+    db.project.count({ where: { organizationId, status: { notIn: ["Complete", "Archived"] } } }),
+    db.client.count({ where: { organizationId, status: "Active" } }),
+  ]);
+  return {
+    asOf: new Date().toISOString(),
+    metrics: { weightedPipeline: 0, paidRevenue: 0, receivables: 0, grossMargin: 0, activeClients, activeProjects },
+    pipelineByStage: [], revenueSeries: [],
+    signals: [{ title: "Delivery priorities", message: `${activeProjects} active projects. Review open tasks and upcoming deadlines.`, href: "/app/tasks", tone: "accent" }],
+    projects: projects.map((project) => ({ ...project, budget: Number(project.budget), spent: Number(project.spent), dueDate: project.dueDate?.toISOString() ?? null })),
+    tasks: tasks.map((task) => ({ ...task, dueDate: task.dueDate?.toISOString() ?? null })),
+  };
+}
+
 export const getDashboardData = cache(async () => {
-  const { organization } = await getWorkspaceContext();
+  const { organization, role } = await getWorkspaceContext();
   const organizationId = organization.id;
+  if (role === "member") return getMemberDashboardData(organizationId);
   const now = new Date();
   const sixMonthsAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
 

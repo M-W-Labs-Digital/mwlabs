@@ -366,13 +366,14 @@ export function supportsCrudResource(resource: string) {
 export async function listCrudRecords(
   resource: string,
   organizationId: string,
-  options: { limit?: number; cursor?: string | null; query?: string | null } = {},
+  options: { limit?: number; cursor?: string | null; query?: string | null; lookup?: boolean } = {},
 ) {
   const spec = getSpec(resource);
   if (!spec) throw new Error("Unsupported resource");
   const limit = Math.min(100, Math.max(10, options.limit ?? 50));
   const query = options.query?.trim().slice(0, 120) || "";
-  const fields = searchFields[resource] ?? [];
+  const lookupFields = spec.fields.filter((field) => ["name", "title", "company", "number", "description"].includes(field));
+  const fields = options.lookup ? lookupFields : searchFields[resource] ?? [];
   const owned = ownershipWhere(spec, organizationId);
   const where = query && fields.length
     ? { AND: [owned, { OR: fields.map((field) => ({ [field]: { contains: query } })) }] }
@@ -385,7 +386,7 @@ export async function listCrudRecords(
   const delegate = getDelegate(spec);
   const [records, total] = await Promise.all([delegate.findMany({
     where,
-    select: selectFields(spec),
+    select: options.lookup ? Object.fromEntries(["id", ...lookupFields].map((field) => [field, true])) : selectFields(spec),
     orderBy,
     take: limit + 1,
     ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
@@ -523,10 +524,10 @@ export async function reconcileCrudRelations(resource: string, record: Record<st
         const subtotal = numeric(aggregate._sum.total);
         await db.invoice.update({ where: { id: invoiceId }, data: { subtotal, total: Math.round((subtotal + numeric(invoice.tax)) * 100) / 100 } });
       }
-      return "Invoice totals were recalculated from line items.";
+      // Reconcile payment status below after changing the amount due.
     }
 
-    if (resource === "payments" && record.invoiceId) {
+    if (["payments", "invoice-items"].includes(resource) && record.invoiceId) {
       const invoiceIds = Array.from(new Set([record.invoiceId, record.__previousInvoiceId].filter(Boolean).map(String)));
       let anyFullyPaid = false;
       for (const invoiceId of invoiceIds) {

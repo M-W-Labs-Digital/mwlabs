@@ -1,4 +1,9 @@
 import { defineConfig } from "prisma/config";
+import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
+
+// Prisma 7 does not automatically load .env when using a config file.
+if (existsSync(".env")) loadEnvFile(".env");
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

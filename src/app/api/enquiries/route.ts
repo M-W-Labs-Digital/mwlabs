@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { assessPublicSubmission } from "@/lib/anti-spam";
+import { hasTrustedMutationOrigin } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { notifyOrganization, queueWorkflowEmail } from "@/lib/notifications";
 import { createLeadBookingPath } from "@/lib/scheduling";
@@ -16,27 +17,8 @@ const enquirySchema = z.object({
   formStartedAt: z.string().optional(),
 });
 
-function trustedOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  const allowed = new Set([new URL(request.url).origin]);
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || request.headers.get("host");
-  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const protocol = forwardedProtocol || new URL(request.url).protocol.replace(":", "");
-  if (host) allowed.add(`${protocol}://${host}`);
-  if (process.env.BETTER_AUTH_URL) {
-    try {
-      allowed.add(new URL(process.env.BETTER_AUTH_URL).origin);
-    } catch {
-      return false;
-    }
-  }
-  return allowed.has(origin);
-}
-
 export async function POST(request: Request) {
-  if (!trustedOrigin(request)) return Response.json({ error: "Invalid request origin." }, { status: 403 });
+  if (!hasTrustedMutationOrigin(request)) return Response.json({ error: "Invalid request origin." }, { status: 403 });
 
   const parsed = enquirySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Please check the enquiry details." }, { status: 400 });
@@ -84,6 +66,7 @@ export async function POST(request: Request) {
     }),
   ]);
 
+  spam.commit?.();
   const bookingPath = createLeadBookingPath(lead.id);
   await notifyOrganization({
     organizationId: organization.id,

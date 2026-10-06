@@ -87,7 +87,7 @@ export function Dashboard({ data, firstName, role = "owner", customer = false }:
   const { metrics } = data;
   const isAdmin = role === "owner" || role === "admin";
   const dateLabel = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "2-digit", month: "long" }).format(new Date(data.asOf));
-  const primaryActionHref = customer ? "/register?new=1" : "/app/leads";
+  const primaryActionHref = customer ? "/register?new=1" : isAdmin ? "/app/leads" : "/app/tasks";
 
   return (
     <div className="admin-page">
@@ -98,24 +98,24 @@ export function Dashboard({ data, firstName, role = "owner", customer = false }:
           <p className="admin-page-description">{customer ? "Track your requests, active work, and account finance from one secure workspace." : isAdmin ? "Here&apos;s the shape of the agency and where your attention has the most leverage." : "See the work, priorities, and delivery signals that need your attention."}</p>
         </div>
         <div className="admin-actions">
-          <Button nativeButton={false} render={<Link href={customer || !isAdmin ? "/app/tasks" : "/app/calendar"} />} variant="outline" className="h-9 bg-white"><CalendarClock className="size-4" /> {customer || !isAdmin ? "My work" : "This week"}</Button>
-          <Button nativeButton={false} render={<Link href={primaryActionHref} />} className="h-9"><Plus className="size-4" /> {customer ? "New request" : "New lead"}</Button>
+          <Button nativeButton={false} render={<Link href={customer ? "/book" : !isAdmin ? "/app/tasks" : "/app/calendar"} />} variant="outline" className="h-9 bg-white"><CalendarClock className="size-4" /> {customer ? "Book a meeting" : !isAdmin ? "My work" : "This week"}</Button>
+          <Button nativeButton={false} render={<Link href={primaryActionHref} />} className="h-9"><Plus className="size-4" /> {customer ? "New request" : isAdmin ? "New lead" : "Open tasks"}</Button>
         </div>
       </div>
 
       <div className="admin-metrics mt-7">
-        <MetricCard label={customer ? "Request value" : isAdmin ? "Weighted pipeline" : "Active projects"} value={customer || isAdmin ? money.format(metrics.weightedPipeline) : `${metrics.activeProjects}`} detail={customer ? `${data.pipelineByStage.length} project requests` : isAdmin ? `${data.pipelineByStage.reduce((sum, item) => sum + item.count, 0)} open opportunities` : "Projects currently in flight"} icon={WalletCards} />
+        <MetricCard label={customer ? "Request value" : isAdmin ? "Weighted pipeline" : "Active projects"} value={customer || isAdmin ? money.format(metrics.weightedPipeline) : `${metrics.activeProjects}`} detail={customer ? `${data.pipelineByStage.reduce((sum, stage) => sum + stage.count, 0)} project requests` : isAdmin ? `${data.pipelineByStage.reduce((sum, item) => sum + item.count, 0)} open opportunities` : "Projects currently in flight"} icon={WalletCards} />
         <MetricCard label={customer ? "Paid with M&W" : isAdmin ? "Revenue collected" : "Open tasks"} value={customer || isAdmin ? money.format(metrics.paidRevenue) : `${data.tasks.length}`} detail={customer || isAdmin ? "Paid invoices in the workspace" : "Priorities assigned to your team"} icon={CircleDollarSign} />
         <MetricCard label={customer ? "Outstanding" : isAdmin ? "Gross margin" : "Delivery signals"} value={customer ? money.format(metrics.receivables) : isAdmin ? `${metrics.grossMargin.toFixed(1)}%` : `${data.signals.length}`} detail={customer ? "Invoices awaiting payment" : isAdmin ? "Paid revenue less recorded expenses" : "Updates requiring attention"} icon={TrendingUp} />
         <MetricCard label={customer ? "Active projects" : "Active relationships"} value={`${customer ? metrics.activeProjects : metrics.activeClients}`} detail={customer ? "Projects currently in flight" : `${metrics.activeProjects} projects in flight`} icon={UsersRound} />
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.55fr_0.85fr]">
-        <section className="admin-card rounded-2xl p-4 sm:p-6">
+        {(isAdmin || customer) && <section className="admin-card rounded-2xl p-4 sm:p-6">
           <div><p className="text-sm font-semibold">Revenue pulse</p><p className="mt-1 text-xs text-muted-foreground">Collected revenue over the last six calendar months</p></div>
           <div className="mt-4"><RevenueChart data={data.revenueSeries} /></div>
           <div className="mt-1 flex flex-wrap gap-x-5 gap-y-2 border-t pt-4 text-[11px] text-muted-foreground"><span className="flex items-center gap-2"><span className="size-2 rounded-full bg-blue-600" />Paid invoice revenue</span><span className="font-semibold text-foreground sm:ml-auto">Receivables {money.format(metrics.receivables)}</span></div>
-        </section>
+        </section>}
 
         <section className="relative overflow-hidden rounded-2xl bg-brand-navy p-6 text-white shadow-[0_18px_45px_rgba(21,93,252,0.18)]">
           <div className="absolute -right-16 -top-16 size-52 rounded-full border border-accent/20"><div className="absolute inset-9 rounded-full border border-white/8" /></div>
@@ -130,7 +130,7 @@ export function Dashboard({ data, firstName, role = "owner", customer = false }:
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="admin-card rounded-2xl">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-4 sm:px-5"><div><h2 className="text-sm font-semibold">Projects in motion</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Budget, progress, and next deadline</p></div><Button nativeButton={false} render={<Link href="/app/projects" />} variant="ghost" className="shrink-0 text-xs">View all <ArrowUpRight className="size-3.5" /></Button></div>
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-4 sm:px-5"><div><h2 className="text-sm font-semibold">Projects in motion</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Budget, progress, and next deadline</p></div>{!customer && <Button nativeButton={false} render={<Link href="/app/projects" />} variant="ghost" className="shrink-0 text-xs">View all <ArrowUpRight className="size-3.5" /></Button>}</div>
           <div className="divide-y">
             {data.projects.length ? data.projects.map((project, index) => {
               const burn = project.budget ? (project.spent / project.budget) * 100 : 0;
@@ -146,7 +146,7 @@ export function Dashboard({ data, firstName, role = "owner", customer = false }:
         </section>
 
         <section className="admin-card rounded-2xl">
-          <div className="flex items-center justify-between gap-3 border-b px-4 py-4 sm:px-5"><div><h2 className="text-sm font-semibold">Today&apos;s focus</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Open commitments across your team</p></div><Button nativeButton={false} render={<Link href="/app/tasks" />} variant="ghost" className="shrink-0 text-xs">All tasks <ArrowUpRight className="size-3.5" /></Button></div>
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-4 sm:px-5"><div><h2 className="text-sm font-semibold">Today&apos;s focus</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Open commitments across your team</p></div>{!customer && <Button nativeButton={false} render={<Link href="/app/tasks" />} variant="ghost" className="shrink-0 text-xs">All tasks <ArrowUpRight className="size-3.5" /></Button>}</div>
           <div className="divide-y px-4 sm:px-5">
             {data.tasks.length ? data.tasks.map((task) => (
               <Link href="/app/tasks" key={task.id} className="flex items-start gap-3 py-3.5"><span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border"><Check className="size-3 text-muted-foreground" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{task.title}</p><div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground"><span>{task.project?.code ?? "OPS"}</span><span>·</span><span>{task.status}</span></div></div><span className={cn("rounded-full px-2 py-1 text-[9px] font-semibold", task.priority === "High" || task.priority === "Urgent" ? "bg-red-50 text-red-700" : task.priority === "Medium" ? "bg-orange-50 text-orange-700" : "bg-muted text-muted-foreground")}>{task.priority}</span></Link>
@@ -155,14 +155,14 @@ export function Dashboard({ data, firstName, role = "owner", customer = false }:
         </section>
       </div>
 
-      <section className="admin-card mt-5 rounded-2xl p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Pipeline movement</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Value and deal count by commercial stage</p></div><Button nativeButton={false} render={<Link href="/app/leads" />} variant="ghost" className="shrink-0 text-xs">Open CRM <ArrowUpRight className="size-3.5" /></Button></div>
+      {(isAdmin || customer) && <section className="admin-card mt-5 rounded-2xl p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Pipeline movement</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Value and deal count by commercial stage</p></div>{isAdmin && <Button nativeButton={false} render={<Link href="/app/leads" />} variant="ghost" className="shrink-0 text-xs">Open CRM <ArrowUpRight className="size-3.5" /></Button>}</div>
         <div className="mt-5 grid gap-2 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           {data.pipelineByStage.map((stage, index) => (
             <div key={stage.stage} className="rounded-xl border bg-muted/25 p-3.5"><div className="flex items-center justify-between"><span className="font-mono text-[9px] text-muted-foreground">0{index + 1}</span><span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold shadow-sm">{stage.count}</span></div><p className="mt-4 text-xs font-semibold">{stage.stage}</p><p className="mt-1 text-lg font-semibold tracking-[-0.03em]">{money.format(stage.value)}</p><div className="mt-3 h-1 rounded-full bg-blue-100"><div className="h-full rounded-full bg-[linear-gradient(90deg,#155dfc,#02d1fa)]" style={{ width: `${Math.min(100, 24 + index * 16)}%` }} /></div></div>
           ))}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

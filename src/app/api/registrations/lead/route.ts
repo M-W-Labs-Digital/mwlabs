@@ -85,5 +85,6 @@ export async function POST(request: Request) {
     );
   }
 
+  spam.commit?.();
   return Response.json({ registered: true, leadId: lead.id }, { status: 200 });
 }

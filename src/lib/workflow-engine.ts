@@ -26,13 +26,16 @@ function workflowEvents(resource: string, action: CrudAction, record: Record<str
 async function ensureClientForLead(organizationId: string, leadId: string, proposalId?: string) {
   const lead = await db.lead.findFirst({ where: { id: leadId, organizationId }, select: { id: true, userId: true, name: true, company: true, email: true, phone: true, value: true, stage: true } });
   if (!lead) return null;
+  const account = lead.userId ? await db.user.findUnique({ where: { id: lead.userId }, select: { email: true, emailVerified: true } }) : null;
+  // Only a verified email can establish access to customer records.
+  const verifiedUserId = account?.emailVerified && account.email.toLowerCase() === lead.email.toLowerCase() ? lead.userId : null;
   let client = await db.client.findFirst({ where: { organizationId, email: lead.email }, select: { id: true, userId: true, lifetimeValue: true } });
   if (!client) {
-    client = await db.client.create({ data: { organizationId, userId: lead.userId, name: lead.name, company: lead.company, email: lead.email, phone: lead.phone, status: "Onboarding", lifetimeValue: lead.value, healthScore: 80, onboardingProgress: 0 }, select: { id: true, userId: true, lifetimeValue: true } });
+    client = await db.client.create({ data: { organizationId, userId: verifiedUserId, name: lead.name, company: lead.company, email: lead.email, phone: lead.phone, status: "Onboarding", lifetimeValue: lead.value, healthScore: 80, onboardingProgress: 0 }, select: { id: true, userId: true, lifetimeValue: true } });
   } else if (numberValue(client.lifetimeValue) < numberValue(lead.value)) {
-    client = await db.client.update({ where: { id: client.id }, data: { lifetimeValue: lead.value, ...(client.userId ? {} : { userId: lead.userId }) }, select: { id: true, userId: true, lifetimeValue: true } });
-  } else if (!client.userId && lead.userId) {
-    client = await db.client.update({ where: { id: client.id }, data: { userId: lead.userId }, select: { id: true, userId: true, lifetimeValue: true } });
+    client = await db.client.update({ where: { id: client.id }, data: { lifetimeValue: lead.value, ...(client.userId ? {} : { userId: verifiedUserId }) }, select: { id: true, userId: true, lifetimeValue: true } });
+  } else if (!client.userId && verifiedUserId) {
+    client = await db.client.update({ where: { id: client.id }, data: { userId: verifiedUserId }, select: { id: true, userId: true, lifetimeValue: true } });
   }
   if (lead.stage !== "Won") await db.lead.update({ where: { id: lead.id }, data: { stage: "Won", probability: 100 } });
   if (proposalId) await db.proposal.update({ where: { id: proposalId }, data: { clientId: client.id } });

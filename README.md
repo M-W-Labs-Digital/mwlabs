@@ -130,3 +130,15 @@ If a restricted container prevents Turbopack from starting its internal CSS work
 - `compose.yaml` — reproducible MySQL 8.4 development service
 
 AI responses are grounded in organization-scoped data. Agency records are treated as untrusted context, secrets stay server-side, and external or consequential actions require human approval.
+
+## Production verification
+
+Run `npm run check`, `npm run security:runtime`, `npm run db:generate`, and `npm run build` before deployment. CI runs these checks on Node 22. `npm run security:check` also audits development tools; its remaining upstream findings are recorded in `PRODUCTION_READINESS.md`.
+
+Run `npm run production:check` with the deployment environment injected (or `node --env-file=.env scripts/check-production.mjs` for a local configuration review). This validates required configuration without printing secrets. Apply committed migrations using `npm run db:deploy`; do not use `db:push` to deploy production schema changes. Prisma commands now load `.env` while retaining explicitly provided environment variables.
+
+`GET /api/health` returns 200 when the database is reachable and 503 otherwise. Monitor it alongside the scheduled background worker. Configure edge rate limits for public APIs when running multiple application instances; the application rate limits are bounded, per-process safeguards.
+
+Run database smoke tests only against a disposable local database with transactional email and AI provider keys disabled. The scripts create and delete records, and the job smoke test processes due jobs. The additional public-flow test is `node --env-file=PATH_TO_TEST_ENV scripts/test-public-workflows.mjs`; it requires a database name ending in `_audit`, a local application URL, and an initialized `mw-labs` workspace with scheduling defaults. It covers booking, rescheduling, cancellation, signed links, customer isolation, and invoice aggregates.
+
+Verify real email delivery, Google sign-in, Gemini responses, database TLS/backups, browser interactions, and scheduler execution in staging before launch. The local automated checks do not validate those external deployment services.

@@ -171,6 +171,13 @@ try {
   const invoiceAfterPayment = await pool.query("SELECT status, paidAt FROM `Invoice` WHERE id = ?", [ids.invoice]);
   assert(invoiceAfterPayment[0]?.status === "Paid" && invoiceAfterPayment[0]?.paidAt, "Full payment did not mark the invoice paid.");
 
+  await mutate("invoice-items", "PATCH", { id: ids.item, data: { unitPrice: 60 } }, cookie);
+  const increasedInvoice = await pool.query("SELECT status, total, paidAt FROM Invoice WHERE id = ?", [ids.invoice]);
+  assert(increasedInvoice[0].status === "Sent" && Number(increasedInvoice[0].total) === 130 && !increasedInvoice[0].paidAt, "Increasing a paid invoice did not reopen its outstanding balance.");
+  await mutate("invoice-items", "PATCH", { id: ids.item, data: { unitPrice: 50 } }, cookie);
+  const reducedInvoice = await pool.query("SELECT status FROM Invoice WHERE id = ?", [ids.invoice]);
+  assert(reducedInvoice[0].status === "Paid", "Reducing an invoice to its recorded payments did not reconcile its status.");
+
   const seo = await mutate("seo-pages", "POST", { data: { title: "Workflow Smoke SEO Page", summary: "A complete smoke test landing page.", content: "This page proves that publishing, generated slugs, and public rendering work together.", status: "Published", noIndex: true } }, cookie);
   ids.seo = seo.record.id;
   assert(seo.record.slug && seo.record.publishedAt, "Published SEO content did not receive a slug and publication time.");
@@ -210,6 +217,22 @@ try {
   await pool.query("UPDATE member SET role = 'member' WHERE organizationId = ? AND userId = ?", [organizationId, userId]);
   const deniedFinance = await request("/api/crud/invoices", { method: "PATCH", body: JSON.stringify({ id: ids.invoice, data: { status: "Void" } }) }, cookie);
   assert(deniedFinance.status === 403, "A member role was allowed to change finance records.");
+
+  for (const resource of ["leads", "invoices", "payments", "proposals", "contracts", "automations"]) {
+    const denied = await request(`/api/crud/${resource}`, {}, cookie);
+    assert(denied.status === 403, `A member could read restricted ${resource}.`);
+  }
+  const lookup = await request("/api/crud/leads?lookup=1", {}, cookie);
+  const lookupBody = await lookup.json();
+  assert(lookup.ok && lookupBody.records.every((record) => Object.keys(record).every((key) => ["id", "name", "company"].includes(key))), "Lead lookup leaked commercial fields.");
+  const deniedLead = await request("/api/leads", { method: "POST", body: JSON.stringify({ name: "Denied", company: "Denied", email, source: "Test", value: 1 }) }, cookie);
+  assert(deniedLead.status === 403, "The legacy lead endpoint bypassed member permissions.");
+  const memberDashboard = await request("/app", {}, cookie);
+  assert(!(await memberDashboard.text()).includes("Revenue pulse"), "The member dashboard exposed financial summaries.");
+  const memberDirectory = await request("/api/team", {}, cookie);
+  assert((await memberDirectory.json()).invitations.length === 0, "The member directory exposed pending invitations.");
+  const decimalPage = await request("/api/crud/tasks?limit=10.5", {}, cookie);
+  assert(decimalPage.ok, "Fractional pagination limits caused a server error.");
 
   console.log("Agency workflow smoke test passed: invitations, roles, teams, conversion, automation, delivery, time, finance, durable media, homepage/blog/work/SEO publishing, live pages, deletion safety, and role boundaries.");
 } finally {

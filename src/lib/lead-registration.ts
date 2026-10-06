@@ -41,12 +41,14 @@ export async function registerLeadProfile(profile: LeadRegistrationProfile) {
   const email = profile.email.trim().toLowerCase();
   const company = clean(profile.company) ?? "Individual enquiry";
   const phone = clean(profile.phone);
+  const user = await db.user.findUnique({ where: { id: profile.userId }, select: { email: true, emailVerified: true } });
+  const mayLinkByEmail = Boolean(user?.emailVerified && user.email.toLowerCase() === email);
   const existingByUser = profile.newRequest ? null : await db.lead.findFirst({
-    where: { userId: profile.userId },
+    where: { userId: profile.userId, organizationId: organization.id },
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
-  const existingByEmail = existingByUser
+  const existingByEmail = existingByUser || !mayLinkByEmail
     ? null
     : await db.lead.findFirst({
         where: {

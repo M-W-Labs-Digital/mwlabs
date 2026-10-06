@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 import { getGeminiClient } from "@/lib/gemini";
 
@@ -9,19 +10,10 @@ const requestSchema = z.object({
   history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().max(1_500) })).max(8).optional().default([]),
 });
 
-const visitors = new Map<string, { count: number; resetAt: number }>();
-
+const visitorRateLimit = createRateLimiter();
 function withinRateLimit(request: Request) {
   const address = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
-  const now = Date.now();
-  const current = visitors.get(address);
-  if (!current || current.resetAt <= now) {
-    visitors.set(address, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (current.count >= 12) return false;
-  current.count += 1;
-  return true;
+  return visitorRateLimit(address, 12, 60_000);
 }
 
 const publicKnowledge = `M&W Labs is an independent digital agency based in Dhaka, working worldwide.

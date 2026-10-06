@@ -3,6 +3,7 @@ import "server-only";
 import { queueNotificationEmailJobs, queueWorkflowEmailJob } from "@/lib/background-jobs";
 import { absoluteAppUrl } from "@/lib/email";
 import { db } from "@/lib/db";
+import { canAccessModule } from "@/lib/permissions";
 
 export type NotificationCategory = "crud" | "activity" | "booking" | "system";
 
@@ -64,10 +65,11 @@ export async function notifyOrganization(event: NotificationEvent) {
     const members = await db.member.findMany({
       where: {
         organizationId: event.organizationId,
-        ...(event.recipientUserIds?.length ? { userId: { in: event.recipientUserIds } } : {}),
+        ...(event.recipientUserIds ? { userId: { in: event.recipientUserIds } } : {}),
       },
       select: {
         userId: true,
+        role: true,
         user: {
           select: {
             notificationPreferences: {
@@ -87,6 +89,8 @@ export async function notifyOrganization(event: NotificationEvent) {
       },
     });
     const rows = members.flatMap((member) => {
+      const targetModule = event.actionUrl?.match(/^\/app\/([^/?#]+)/)?.[1];
+      if (targetModule && !canAccessModule(member.role, targetModule)) return [];
       const preference = member.user.notificationPreferences[0] ?? {
         inAppEnabled: true,
         emailEnabled: true,

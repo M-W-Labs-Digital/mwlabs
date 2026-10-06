@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 import { getAgencyContext, saveAiExchange } from "@/lib/ai-context";
 import { requireApiSession } from "@/lib/dal";
 import { getGeminiClient } from "@/lib/gemini";
+import { canAccessModule, isWorkspaceAdmin } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 
@@ -11,18 +13,9 @@ const requestSchema = z.object({
   threadId: z.string().max(191).optional(),
 });
 
-const aiRequests = new Map<string, { count: number; resetAt: number }>();
-
+const aiRateLimit = createRateLimiter();
 function withinAiRateLimit(key: string) {
-  const now = Date.now();
-  const current = aiRequests.get(key);
-  if (!current || current.resetAt <= now) {
-    aiRequests.set(key, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (current.count >= 12) return false;
-  current.count += 1;
-  return true;
+  return aiRateLimit(key, 12, 60_000);
 }
 
 const systemInstruction = `You are M&W Intelligence, the internal operating partner for M&W Labs.
@@ -67,6 +60,7 @@ _Gemini is not configured in this environment, so this briefing was generated fr
 export async function POST(request: Request) {
   const session = await requireApiSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canAccessModule(session.role, "ai")) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (!withinAiRateLimit(`${session.organizationId}:${session.userId}`)) {
     return Response.json({ error: "Too many AI requests. Please wait a minute and try again." }, { status: 429 });
   }
@@ -74,12 +68,15 @@ export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Enter a clear question under 4,000 characters." }, { status: 400 });
 
-  const context = await getAgencyContext(session.organizationId);
+  const context = await getAgencyContext(session.organizationId, session.role);
+  const localBrief = () => isWorkspaceAdmin(session.role)
+    ? offlineBrief(parsed.data.message, context)
+    : `Your delivery workspace has ${context.projects.length} recent active projects and ${context.tasks.length} open tasks in this brief. Review upcoming deadlines in Projects and prioritize your Tasks. AI synthesis is currently unavailable.`;
   let answer: string;
 
   const ai = getGeminiClient();
   if (!ai) {
-    answer = offlineBrief(parsed.data.message, context);
+    answer = localBrief();
   } else {
     try {
       const result = await ai.models.generateContent({
@@ -104,7 +101,7 @@ export async function POST(request: Request) {
         name: error instanceof Error ? error.name : "UnknownError",
         organizationId: session.organizationId,
       });
-      answer = `${offlineBrief(parsed.data.message, context)}\n\n_Gemini was temporarily unavailable, so M&W Intelligence used the local agency rules instead._`;
+      answer = localBrief();
     }
   }
 

@@ -42,6 +42,7 @@ export function assessPublicSubmission(request: Request, values: {
   const bucketKey = `${options.bucket}:${address}`;
   const current = requestBuckets.get(bucketKey);
   if (!current || current.resetAt <= now) {
+    if (!current && requestBuckets.size >= 10_000) return { allowed: false, status: 429, error: "Too many requests. Please try again later." };
     requestBuckets.set(bucketKey, { count: 1, resetAt: now + 60 * 60 * 1_000 });
   } else if (current.count >= options.limit) {
     return { allowed: false, status: 429, error: "Too many requests. Please try again later." };
@@ -51,7 +52,7 @@ export function assessPublicSubmission(request: Request, values: {
 
   if (values.honeypot?.trim()) return { allowed: false, status: 202, error: null };
 
-  const startedAt = Number(values.formStartedAt);
+  const startedAt = values.formStartedAt?.trim() ? Number(values.formStartedAt) : NaN;
   if (Number.isFinite(startedAt) && (now - startedAt < 1_200 || now - startedAt > 24 * 60 * 60 * 1_000)) {
     return { allowed: false, status: 202, error: null };
   }
@@ -61,8 +62,7 @@ export function assessPublicSubmission(request: Request, values: {
 
   const fingerprint = spamFingerprint({ ...values, ip: address });
   const duplicateWindowMs = options.duplicateWindowMs ?? 15 * 60 * 1_000;
-  if (recentSubmissions.has(fingerprint)) return { allowed: false, status: 202, error: null };
-  recentSubmissions.set(fingerprint, now + duplicateWindowMs);
+  if (recentSubmissions.has(fingerprint)) return { allowed: false, status: 409, error: "This request was already received. Please check your confirmation before submitting again." };
 
-  return { allowed: true, status: 200, error: null };
+  return { allowed: true, status: 200, error: null, commit: () => { if (recentSubmissions.size < 10_000) recentSubmissions.set(fingerprint, Date.now() + duplicateWindowMs); } };
 }

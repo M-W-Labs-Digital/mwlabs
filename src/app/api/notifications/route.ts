@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { notificationAccessWhere } from "@/lib/permissions";
 
 import { queueNotificationEmailJobs } from "@/lib/background-jobs";
 import { requireApiSession } from "@/lib/dal";
@@ -18,10 +19,11 @@ export async function GET(request: Request) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const url = new URL(request.url);
   const requestedLimit = Number(url.searchParams.get("limit") || 40);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 40;
+  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.floor(requestedLimit))) : 40;
   const category = url.searchParams.get("category");
   const unreadOnly = url.searchParams.get("unread") === "true";
   const where = {
+    ...notificationAccessWhere(session.role),
     userId: session.userId,
     organizationId: session.organizationId,
     inApp: true,
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
       },
     }),
     db.notification.count({
-      where: { userId: session.userId, organizationId: session.organizationId, inApp: true, archivedAt: null, readAt: null },
+      where: { ...notificationAccessWhere(session.role), userId: session.userId, organizationId: session.organizationId, inApp: true, archivedAt: null, readAt: null },
     }),
   ]);
   return Response.json({ notifications, unreadCount }, { headers: { "Cache-Control": "no-store" } });
@@ -63,7 +65,7 @@ export async function PATCH(request: Request) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const parsed = changeSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Invalid notification change." }, { status: 400 });
-  const owned = { userId: session.userId, organizationId: session.organizationId };
+  const owned = { ...notificationAccessWhere(session.role), userId: session.userId, organizationId: session.organizationId };
 
   if (parsed.data.action === "read-all") {
     const result = await db.notification.updateMany({ where: { ...owned, inApp: true, archivedAt: null, readAt: null }, data: { readAt: new Date() } });

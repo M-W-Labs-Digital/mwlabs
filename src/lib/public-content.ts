@@ -140,33 +140,33 @@ export async function getHomepageContent() {
 
 export async function getPublishedBlogPosts(page = 1, pageSize = 18) {
   const limit = Math.min(48, Math.max(6, pageSize));
-  const currentPage = Math.max(1, page);
+  const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
 
   return withContentFallback("blog listing", async () => {
     const where = publishedAtOrBeforeNow();
-    const [posts, total] = await Promise.all([
-      db.blogPost.findMany({
-        where,
-        orderBy: [{ featured: "desc" }, { publishedAt: "desc" }, { id: "desc" }],
-        skip: (currentPage - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          excerpt: true,
-          coverImage: true,
-          category: true,
-          authorName: true,
-          featured: true,
-          publishedAt: true,
-          updatedAt: true,
-        },
-      }),
-      db.blogPost.count({ where }),
-    ]);
-    return { posts, total, page: currentPage, pages: Math.max(1, Math.ceil(total / limit)) };
-  }, { posts: [], total: 0, page: currentPage, pages: 1 });
+    const total = await db.blogPost.count({ where });
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const currentPage = Math.min(requestedPage, pages);
+    const posts = await db.blogPost.findMany({
+      where,
+      orderBy: [{ featured: "desc" }, { publishedAt: "desc" }, { id: "desc" }],
+      skip: (currentPage - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        coverImage: true,
+        category: true,
+        authorName: true,
+        featured: true,
+        publishedAt: true,
+        updatedAt: true,
+      },
+    });
+    return { posts, total, page: currentPage, pages };
+  }, { posts: [], total: 0, page: 1, pages: 1 });
 }
 
 export const getPublishedBlogPost = cache(async (slug: string) => {
@@ -177,35 +177,35 @@ export const getPublishedBlogPost = cache(async (slug: string) => {
 
 export async function getPublishedWorkPosts(page = 1, pageSize = 12) {
   const limit = Math.min(36, Math.max(4, pageSize));
-  const currentPage = Math.max(1, page);
+  const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
 
   return withContentFallback("work listing", async () => {
     const where = publishedAtOrBeforeNow();
-    const [posts, total] = await Promise.all([
-      db.workPost.findMany({
-        where,
-        orderBy: [{ featured: "desc" }, { publishedAt: "desc" }, { id: "desc" }],
-        skip: (currentPage - 1) * limit,
-        take: limit,
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          clientName: true,
-          industry: true,
-          services: true,
-          summary: true,
-          coverImage: true,
-          featured: true,
-          completedAt: true,
-          publishedAt: true,
-          updatedAt: true,
-        },
-      }),
-      db.workPost.count({ where }),
-    ]);
-    return { posts, total, page: currentPage, pages: Math.max(1, Math.ceil(total / limit)) };
-  }, { posts: [], total: 0, page: currentPage, pages: 1 });
+    const total = await db.workPost.count({ where });
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const currentPage = Math.min(requestedPage, pages);
+    const posts = await db.workPost.findMany({
+      where,
+      orderBy: [{ featured: "desc" }, { publishedAt: "desc" }, { id: "desc" }],
+      skip: (currentPage - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        clientName: true,
+        industry: true,
+        services: true,
+        summary: true,
+        coverImage: true,
+        featured: true,
+        completedAt: true,
+        publishedAt: true,
+        updatedAt: true,
+      },
+    });
+    return { posts, total, page: currentPage, pages };
+  }, { posts: [], total: 0, page: 1, pages: 1 });
 }
 
 export const getPublishedWorkPost = cache(async (slug: string) => {

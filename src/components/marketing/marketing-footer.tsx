@@ -103,7 +103,7 @@ export function MarketingFooter() {
 
         <div className="grid gap-12 py-14 sm:py-16 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 xl:gap-24">
           <div className="min-w-0">
-            <Link href="#top" className="relative block h-12 w-44 rounded-xl bg-white px-2 sm:h-14 sm:w-52" aria-label="M&W Labs home">
+            <Link href="/#top" className="relative block h-12 w-44 rounded-xl bg-white px-2 sm:h-14 sm:w-52" aria-label="M&W Labs home">
               <Image src="/mw-logo.png" alt="M&W Labs" fill sizes="208px" className="object-contain p-1.5" />
             </Link>
             <p className="mt-6 max-w-xl text-2xl font-black leading-tight tracking-[-0.035em] text-slate-200 sm:text-3xl">We build the digital layer between your ambition and your next stage of growth.</p>

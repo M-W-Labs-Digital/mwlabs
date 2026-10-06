@@ -1,7 +1,7 @@
 export const authCookiePrefix = "mwlabscmd";
 export const defaultPostAuthPath = "/auth/continue";
 
-const safeAuthPathPrefixes = ["/app", "/register", "/book"];
+const safeAuthPathPrefixes = ["/app", "/portal", "/register", "/book", "/invite"];
 const internalUrlBase = "https://mwlabs.local";
 
 function isAllowedAuthPath(pathname: string) {
@@ -9,7 +9,7 @@ function isAllowedAuthPath(pathname: string) {
 }
 
 export function safePostAuthPath(value: string | null | undefined, fallback = defaultPostAuthPath) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return fallback;
 
   try {
     const url = new URL(value, internalUrlBase);

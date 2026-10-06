@@ -55,7 +55,11 @@ const taskStatus = z.enum(["Backlog", "Today", "In progress", "Review", "Done"])
 const taskPriority = z.enum(["Low", "Medium", "High", "Urgent"]);
 const invoiceStatus = z.enum(["Draft", "Sent", "Paid", "Overdue", "Void"]);
 const contentResources = new Set(["blog-posts", "work-posts", "seo-pages"]);
-const reservedPageSlugs = new Set(["app", "api", "auth", "blog", "portal", "register", "robots.txt", "sign-in", "sign-up", "sitemap.xml", "work", "_next"]);
+const reservedPageSlugs = new Set([
+  "app", "api", "auth", "blog", "book", "forgot-password", "invite", "media",
+  "portal", "register", "reset-password", "robots.txt", "sign-in", "sign-up",
+  "sitemap", "sitemap.xml", "work", "_next",
+]);
 const searchFields: Record<string, string[]> = {
   leads: ["name", "company", "email", "phone", "source", "stage", "ownerName"],
   clients: ["name", "company", "email", "phone", "status"],

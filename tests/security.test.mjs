@@ -33,6 +33,12 @@ test('post-auth redirects reject external and encoded host tricks', () => {
     assert.equal(safePostAuthPath(path), '/auth/continue', path);
   }
   assert.equal(safePostAuthPath('/app/tasks?view=mine'), '/app/tasks?view=mine');
+  for (const path of ['/portal', '/book/manage?booking=signed-token', '/invite/invitation-id']) {
+    assert.equal(safePostAuthPath(path), path);
+  }
+  for (const path of ['/portal-malicious', '/invite/../../sign-in', '/book/../../evil', '/invite/\\evil.example']) {
+    assert.equal(safePostAuthPath(path), '/auth/continue', path);
+  }
 });
 
 test('failed submissions can retry, successful duplicates report a conflict', () => {

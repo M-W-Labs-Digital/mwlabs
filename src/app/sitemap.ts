@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { notFound } from "next/navigation";
 
 import { Prisma } from "@/generated/prisma/client";
 import { getSitemapContent, getSitemapCounts, siteUrl } from "@/lib/public-content";
@@ -58,7 +59,9 @@ export async function generateSitemaps() {
 }
 
 export default async function sitemap({ id }: { id: Promise<string> }): Promise<MetadataRoute.Sitemap> {
-  const sitemapId = Math.max(0, Number(await id) || 0);
+  const value = await id;
+  const sitemapId = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(sitemapId)) notFound();
   let content: Awaited<ReturnType<typeof getSitemapContent>>;
 
   try {

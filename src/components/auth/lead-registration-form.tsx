@@ -67,6 +67,8 @@ export function LeadRegistrationForm({
   workspaceReady,
   newRequest = false,
 }: LeadRegistrationFormProps) {
+  const [accountCreated, setAccountCreated] = useState(false);
+  const completingProfile = profileOnly || accountCreated;
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -95,7 +97,7 @@ export function LeadRegistrationForm({
     if (
       !profile.name ||
       !profile.company ||
-      (!profileOnly && !email) ||
+      (!completingProfile && !email) ||
       !profile.serviceInterest ||
       !profile.budgetRange ||
       profile.projectBrief.length < 10
@@ -106,7 +108,7 @@ export function LeadRegistrationForm({
       return;
     }
 
-    if (!profileOnly) {
+    if (!completingProfile) {
       const strongPassword =
         password.length >= 10 &&
         /[a-z]/.test(password) &&
@@ -126,14 +128,16 @@ export function LeadRegistrationForm({
 
     setPending(true);
     try {
-      if (!profileOnly) {
+      if (!completingProfile) {
         const result = await authClient.signUp.email({
           ...profile,
           email,
           password,
           name: profile.name,
+          callbackURL: "/auth/verified",
         });
         if (result.error) throw new Error(result.error.message);
+        setAccountCreated(true);
       }
 
       const response = await fetch("/api/registrations/lead", {
@@ -148,7 +152,7 @@ export function LeadRegistrationForm({
         throw new Error(payload?.error ?? "Could not complete registration.");
       }
 
-      toast.success(profileOnly ? "Your project profile is complete" : "Registration complete", {
+      toast.success(completingProfile ? "Your project profile is complete" : "Registration complete", {
         description: "Your project is in the workflow; you can book discovery from the portal.",
       });
       router.push("/app");
@@ -218,7 +222,7 @@ export function LeadRegistrationForm({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.62rem] font-black uppercase tracking-[0.2em] text-blue-600">
-                  {profileOnly ? "Complete your lead profile" : "Register your opportunity"}
+                  {completingProfile ? "Complete your lead profile" : "Register your opportunity"}
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl">
                   Tell us what growth looks like for you.
@@ -243,7 +247,7 @@ export function LeadRegistrationForm({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="registration-email">Work email</Label>
-                <Input id="registration-email" name="email" type="email" autoComplete="email" defaultValue={defaults.email} placeholder="you@company.com" disabled={profileOnly} required className="h-12 rounded-xl bg-white disabled:opacity-70" />
+                <Input id="registration-email" name="email" type="email" autoComplete="email" defaultValue={defaults.email} placeholder="you@company.com" disabled={completingProfile} required className="h-12 rounded-xl bg-white disabled:opacity-70" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="registration-phone">Phone <span className="font-normal text-slate-400">(optional)</span></Label>
@@ -279,7 +283,7 @@ export function LeadRegistrationForm({
               <Textarea id="registration-brief" name="projectBrief" defaultValue={defaults.projectBrief} minLength={10} maxLength={4000} placeholder="What are you trying to achieve, and what is currently getting in the way?" required className="min-h-32 resize-y rounded-xl bg-white py-3" />
             </div>
 
-            {!profileOnly && (
+            {!completingProfile && (
               <div className="rounded-2xl border border-blue-100 bg-blue-50/45 p-4 sm:p-5">
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -320,11 +324,11 @@ export function LeadRegistrationForm({
 
             <Button type="submit" disabled={pending || !workspaceReady} className="group h-14 w-full rounded-xl bg-slate-950 text-sm font-black text-white shadow-[0_18px_45px_rgba(15,23,42,0.2)] hover:bg-blue-700">
               {pending ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {pending ? "Registering your project…" : profileOnly ? "Complete project profile" : "Register and submit project"}
+              {pending ? "Registering your project…" : completingProfile ? "Complete project profile" : "Register and submit project"}
               {!pending && <ArrowRight className="size-4 transition group-hover:translate-x-1" />}
             </Button>
 
-            {!profileOnly && (
+            {!completingProfile && (
               <p className="text-center text-sm font-semibold text-slate-500">
                 Already registered?{" "}
                 <Link href="/sign-in?next=/app" className="font-black text-blue-700 underline decoration-blue-200 underline-offset-4">Sign in to your workspace</Link>

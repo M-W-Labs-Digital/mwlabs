@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run db:generate",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
@@ -30,8 +31,8 @@
     "@better-auth/prisma-adapter": "^1.6.26",
     "@google/genai": "^2.16.0",
     "@gsap/react": "^2.1.2",
-    "@prisma/adapter-mariadb": "^7.9.1",
-    "@prisma/client": "^7.9.1",
+    "@prisma/adapter-mariadb": "7.10.0",
+    "@prisma/client": "7.10.0",
     "better-auth": "^1.6.26",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -59,10 +60,10 @@
     "@types/three": "^0.185.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
-    "prisma": "^7.9.1",
+    "prisma": "7.10.0",
+    "shadcn": "^4.16.1",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "shadcn": "^4.16.1"
+    "typescript": "^5"
   },
   "overrides": {
     "mariadb": "3.5.4",

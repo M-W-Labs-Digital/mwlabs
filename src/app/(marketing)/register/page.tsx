@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LeadRegistrationForm } from "@/components/auth/lead-registration-form";
-import { getCurrentAuthSession } from "@/lib/dal";
-import { db } from "@/lib/db";
+import { getRegistrationPageState } from "@/lib/registration-page";
 
 export const metadata: Metadata = {
   title: "Register your project",
@@ -13,50 +13,19 @@ export const dynamic = "force-dynamic";
 
 export default async function RegisterPage({ searchParams }: PageProps<"/register">) {
   const query = await searchParams;
-  const newRequest = query.new === "1";
-  const [session, workspace] = await Promise.all([
-    getCurrentAuthSession(),
-    db.organization.findUnique({ where: { slug: "mw-labs" }, select: { id: true } }),
-  ]);
-
-  if (!session?.user?.id) {
-    return <LeadRegistrationForm workspaceReady={Boolean(workspace)} />;
+  const state = await getRegistrationPageState(query.new === "1");
+  if (state.status === "redirect") redirect(state.destination);
+  if (state.status === "unavailable") {
+    return (
+      <section className="mx-auto max-w-xl px-5 py-24" role="alert">
+        <h1 className="text-3xl font-semibold tracking-tight">Project registration is temporarily unavailable.</h1>
+        <p className="mt-4 leading-7 text-muted-foreground">We couldn&apos;t connect to the registration service. Please try again shortly, or contact M&amp;W Labs about your project.</p>
+        <div className="mt-8 flex flex-wrap gap-4">
+          <Link href={query.new === "1" ? "/register?new=1" : "/register"} prefetch={false} className="rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white">Try again</Link>
+          <Link href="/#contact" className="rounded-xl border px-5 py-3 font-semibold">Contact M&amp;W Labs</Link>
+        </div>
+      </section>
+    );
   }
-
-  const [membership, lead, user] = await Promise.all([
-    db.member.findFirst({ where: { userId: session.user.id }, select: { id: true } }),
-    db.lead.findFirst({ where: { userId: session.user.id }, select: { id: true } }),
-    db.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        name: true,
-        email: true,
-        company: true,
-        phone: true,
-        serviceInterest: true,
-        budgetRange: true,
-        projectBrief: true,
-      },
-    }),
-  ]);
-
-  if (membership) redirect("/app");
-  if (lead && !newRequest) redirect("/app");
-
-  return (
-    <LeadRegistrationForm
-      profileOnly
-      workspaceReady={Boolean(workspace)}
-      newRequest={newRequest}
-      defaults={{
-        name: user?.name ?? session.user.name,
-        email: user?.email ?? session.user.email,
-        company: user?.company ?? undefined,
-        phone: user?.phone ?? undefined,
-        serviceInterest: user?.serviceInterest ?? undefined,
-        budgetRange: user?.budgetRange ?? undefined,
-        projectBrief: user?.projectBrief ?? undefined,
-      }}
-    />
-  );
+  return <LeadRegistrationForm {...state} />;
 }

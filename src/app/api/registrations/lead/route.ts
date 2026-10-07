@@ -17,7 +17,7 @@ const registrationProfileSchema = z.object({
   newRequest: z.boolean().optional().default(false),
 });
 
-export async function POST(request: Request) {
+async function registerProject(request: Request) {
   if (!hasTrustedMutationOrigin(request)) {
     return Response.json({ error: "Invalid request origin." }, { status: 403 });
   }
@@ -87,4 +87,16 @@ export async function POST(request: Request) {
 
   spam.commit?.();
   return Response.json({ registered: true, leadId: lead.id }, { status: 200 });
+}
+
+export async function POST(request: Request) {
+  try {
+    return await registerProject(request);
+  } catch (error) {
+    console.error("Project registration failed", error);
+    return Response.json(
+      { error: "Registration is temporarily unavailable. Your account may already have been created; please retry or sign in to complete your project profile." },
+      { status: 503 },
+    );
+  }
 }

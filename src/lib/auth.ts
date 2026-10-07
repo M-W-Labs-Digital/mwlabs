@@ -7,6 +7,7 @@ import { organization } from "better-auth/plugins";
 import { z } from "zod";
 
 import { promoteUserToStaff } from "@/lib/account-upgrade";
+import { getAuthConfig } from "@/lib/auth-config";
 import { authCookiePrefix } from "@/lib/auth-shared";
 import { db } from "@/lib/db";
 import { notificationEmailTemplate, sendEmail } from "@/lib/email";
@@ -62,7 +63,7 @@ async function recordOrganizationActivity({ organizationId, actorId, action, res
 
 export const auth = betterAuth({
   appName: "M&W Command",
-  baseURL: process.env.BETTER_AUTH_URL,
+  ...getAuthConfig(),
   secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(db, { provider: "mysql" }),
   user: {

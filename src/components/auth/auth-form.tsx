@@ -16,6 +16,7 @@ type AuthFormProps = {
   mode: "sign-in" | "sign-up";
   googleEnabled: boolean;
   nextPath?: string;
+  oauthError?: boolean;
 };
 
 function makeSlug(value: string) {
@@ -27,7 +28,7 @@ function makeSlug(value: string) {
   return `${normalized || "agency"}-${crypto.randomUUID().slice(0, 5)}`;
 }
 
-export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: AuthFormProps) {
+export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue", oauthError = false }: AuthFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -41,9 +42,9 @@ export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: A
     const name = String(form.get("name") ?? "").trim();
     const agency = String(form.get("agency") ?? "").trim();
 
-    if (!email || password.length < 10 || (signUpMode && (!name || !agency))) {
+    if (!email || !password || (signUpMode && (password.length < 10 || !name || !agency))) {
       toast.error("Check the form", {
-        description: "Use a valid email and a password of at least 10 characters.",
+        description: signUpMode ? "Use a valid email and a password of at least 10 characters." : "Enter your email and password.",
       });
       return;
     }
@@ -81,7 +82,9 @@ export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: A
           callbackURL: nextPath,
         });
         if (result.error) throw new Error(result.error.message);
-        router.push(nextPath);
+        // Load a fresh server tree after the session cookie has been written.
+        window.location.assign(nextPath);
+        return;
       }
       router.refresh();
     } catch (error) {
@@ -95,14 +98,17 @@ export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: A
 
   async function handleGoogle() {
     setPending(true);
-    const result = await authClient.signIn.social({
-      provider: "google",
-      callbackURL: nextPath,
-      newUserCallbackURL: "/auth/continue",
-    });
-    if (result?.error) {
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: nextPath,
+        newUserCallbackURL: nextPath,
+        errorCallbackURL: "/sign-in?error=oauth",
+      });
+      if (result?.error) throw new Error(result.error.message);
+    } catch (error) {
       setPending(false);
-      toast.error("Google sign-in failed", { description: result.error.message });
+      toast.error("Google sign-in failed", { description: error instanceof Error ? error.message : "Please try again." });
     }
   }
 
@@ -125,6 +131,8 @@ export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: A
                 : "Return to the private operating system for M&W Labs."}
             </p>
           </div>
+
+          {oauthError && <p role="alert" className="mb-6 text-sm text-destructive">Google sign-in could not be completed. Please try again or sign in with email.</p>}
 
           {googleEnabled && (
             <Button type="button" variant="outline" className="h-11 w-full" onClick={handleGoogle} disabled={pending}>
@@ -159,7 +167,6 @@ export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: A
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                {!signUpMode && <span className="text-xs text-muted-foreground">10+ characters</span>}
               </div>
               <div className="relative">
                 <Input
@@ -167,8 +174,8 @@ export function AuthForm({ mode, googleEnabled, nextPath = "/auth/continue" }: A
                   name="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete={signUpMode ? "new-password" : "current-password"}
-                  minLength={10}
-                  maxLength={128}
+                  minLength={signUpMode ? 10 : undefined}
+                  maxLength={signUpMode ? 128 : undefined}
                   required
                   className="h-11 bg-white pr-11"
                 />

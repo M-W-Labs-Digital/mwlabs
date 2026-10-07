@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
+import { getAuthConfig } from "@/lib/auth-config";
 import { db } from "@/lib/db";
 
 const authoritativeSessionQuery = { disableCookieCache: true } as const;
@@ -27,13 +28,7 @@ export function hasTrustedMutationOrigin(request: Request) {
   if (!origin) return false;
 
   const trustedOrigins = new Set([new URL(request.url).origin]);
-  if (process.env.BETTER_AUTH_URL) {
-    try {
-      trustedOrigins.add(new URL(process.env.BETTER_AUTH_URL).origin);
-    } catch {
-      return false;
-    }
-  }
+  for (const trustedOrigin of getAuthConfig().trustedOrigins) trustedOrigins.add(trustedOrigin);
 
   return trustedOrigins.has(origin);
 }

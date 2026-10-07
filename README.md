@@ -61,6 +61,8 @@ The included development database uses a non-root `mwlabs_app` user and a separa
 
 Production should use TLS for MySQL, an application-specific database user, managed secret storage, and a transaction email provider before requiring email verification.
 
+For the Hostinger deployment, set `BETTER_AUTH_URL=https://mwlabs.digital` and `NEXT_PUBLIC_SITE_URL=https://mwlabs.digital` in the hosting environment, then rebuild and redeploy. Authentication uses an explicit public origin instead of inferring the internal Hostinger host. Production ignores HTTP/loopback URL settings and falls back to `https://mwlabs.digital`; a valid public HTTPS `BETTER_AUTH_URL` overrides this default for staging or another deployment. URL paths are removed so auth endpoints stay under `/api/auth`. Register `https://mwlabs.digital/api/auth/callback/google` as the Google OAuth redirect URI. Keep the same `BETTER_AUTH_SECRET` across builds and instances so existing sessions remain valid.
+
 ## Native scheduling workflow
 
 Scheduling is built into M&W Command and has no third-party account, token, webhook, or paid-plan dependency. Owners and administrators configure it under `/app/scheduling`.

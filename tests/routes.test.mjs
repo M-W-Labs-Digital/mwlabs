@@ -53,7 +53,7 @@ test('archive pagination handles malformed and out-of-range requests', async () 
   const parsed = ts.createSourceFile('public-content.ts', source, ts.ScriptTarget.Latest, true);
   const functions = parsed.statements.filter((statement) => ts.isFunctionDeclaration(statement)
     && ['getPublishedBlogPosts', 'getPublishedWorkPosts'].includes(statement.name?.text));
-  const module = await load(`
+  const contentModule = await load(`
     let lastQuery;
     const delegate = { count: async () => 37, findMany: async (query) => { lastQuery = query; return []; } };
     const db = { blogPost: delegate, workPost: delegate };
@@ -62,17 +62,17 @@ test('archive pagination handles malformed and out-of-range requests', async () 
     export const query = () => lastQuery;
     ${functions.map((statement) => statement.getText(parsed)).join('\n')}
   `);
-  for (const method of [module.getPublishedBlogPosts, module.getPublishedWorkPosts]) {
+  for (const method of [contentModule.getPublishedBlogPosts, contentModule.getPublishedWorkPosts]) {
     for (const input of [NaN, Infinity, -1, 0, 1.5, Number.MAX_VALUE]) {
       assert.equal((await method(input, 12)).page, 1);
-      assert.equal(module.query().skip, 0);
+      assert.equal(contentModule.query().skip, 0);
     }
     const last = await method(999, 12);
     assert.equal(last.page, 4);
     assert.equal(last.pages, 4);
-    assert.equal(module.query().skip, 36);
+    assert.equal(contentModule.query().skip, 36);
     assert.equal((await method(2, 12)).page, 2);
-    assert.equal(module.query().skip, 12);
+    assert.equal(contentModule.query().skip, 12);
   }
 });
 

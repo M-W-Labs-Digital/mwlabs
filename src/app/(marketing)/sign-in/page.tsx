@@ -21,6 +21,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
       mode="sign-in"
       googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
       nextPath={nextPath}
+      oauthError={typeof params.error === "string"}
     />
   );
 }

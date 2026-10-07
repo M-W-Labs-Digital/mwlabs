@@ -59,8 +59,10 @@ test('health detects missing registration tables even when SELECT 1 succeeds', a
   const createHealth = await factory('src/app/api/health/route.ts', 'db', 'GET');
   const db = { $queryRaw: async () => [{ 1: 1 }], organization: { findFirst: async () => null } };
   assert.equal((await createHealth(db)()).status, 200);
-  db.organization.findFirst = async () => { throw new Error('Table does not exist'); };
-  assert.equal((await createHealth(db)()).status, 503);
+  db.organization.findFirst = async () => { throw Object.assign(new Error('Private database details'), { code: 'P2021' }); };
+  const unavailable = await createHealth(db)();
+  assert.equal(unavailable.status, 503);
+  assert.deepEqual(await unavailable.json(), { status: 'unavailable', code: 'P2021' });
 });
 
 test('registration API returns a recoverable error without leaking database details', async () => {

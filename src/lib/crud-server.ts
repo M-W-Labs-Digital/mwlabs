@@ -56,8 +56,8 @@ const taskPriority = z.enum(["Low", "Medium", "High", "Urgent"]);
 const invoiceStatus = z.enum(["Draft", "Sent", "Paid", "Overdue", "Void"]);
 const contentResources = new Set(["blog-posts", "work-posts", "seo-pages"]);
 const reservedPageSlugs = new Set([
-  "app", "api", "auth", "blog", "book", "forgot-password", "invite", "media",
-  "portal", "register", "reset-password", "robots.txt", "sign-in", "sign-up",
+  "app", "api", "auth", "blog", "book", "contact", "forgot-password", "invite", "media",
+  "portal", "register", "reset-password", "robots.txt", "sign-in", "sign-up", "terms",
   "sitemap", "sitemap.xml", "work", "_next",
 ]);
 const searchFields: Record<string, string[]> = {

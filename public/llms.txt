@@ -1,0 +1,19 @@
+# M&W Labs
+
+> M&W Labs is an independent digital studio based in Demra, Dhaka, Bangladesh, collaborating with founders and teams worldwide.
+
+M&W Labs builds websites, software, SaaS platforms, brands, digital marketing campaigns, content, AI automation, and growth systems. The studio combines development, design, marketing, and strategy.
+
+Contact: hello@mwlabs.digital
+Phone: +44 20 3769 7100
+
+## Key pages
+
+- [About M&W Labs](https://mwlabs.digital/#about)
+- [Services](https://mwlabs.digital/#services)
+- [Recent work](https://mwlabs.digital/work)
+- [Insights and articles](https://mwlabs.digital/blog)
+- [Book a discovery call](https://mwlabs.digital/book)
+- [Contact](https://mwlabs.digital/contact)
+- [Terms of Service](https://mwlabs.digital/terms)
+- [Markdown homepage](https://mwlabs.digital/)

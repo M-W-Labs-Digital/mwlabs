@@ -1,0 +1,11 @@
+User-Agent: *
+Allow: /
+Disallow: /api/
+Disallow: /app/
+Disallow: /auth/
+Disallow: /portal
+
+Content-Signal: search=yes, ai-train=no
+
+Sitemap: https://mwlabs.digital/sitemap.xml
+Host: https://mwlabs.digital

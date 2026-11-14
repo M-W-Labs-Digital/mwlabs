@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -31,9 +32,12 @@ import { MarketingHero } from "@/components/marketing/marketing-hero";
 import { MarketingReception, ProjectEnquiryForm, TestimonialsCarousel } from "@/components/marketing/marketing-interactions";
 import { ContentCover } from "@/components/marketing/published-content";
 import { Reveal } from "@/components/marketing/reveal";
-import { getHomepageContent } from "@/lib/public-content";
+import { getHomepageContent, siteUrl } from "@/lib/public-content";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 type Service = {
   icon: LucideIcon;
@@ -50,6 +54,57 @@ const services: Service[] = [
   { icon: Bot, title: "AI & Automation", copy: "AI chatbots, agents, workflows, dashboards and smart integrations.", tone: "bg-brand-navy text-cyan-300" },
   { icon: LineChart, title: "Growth Strategy", copy: "Business strategy, market research, competitor analysis and scaling plans.", tone: "bg-indigo-50 text-indigo-700" },
 ];
+
+const homepageJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${siteUrl}#organization`,
+      name: "M&W Labs",
+      url: siteUrl.toString(),
+      description: "An independent digital studio in Dhaka building digital products and growth systems for teams worldwide.",
+      email: "hello@mwlabs.digital",
+      telephone: "+442037697100",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Dhaka",
+        addressCountry: "BD",
+      },
+      sameAs: [
+        "https://www.instagram.com/info.mwlabs",
+        "https://www.linkedin.com/company/mwlabs",
+        "https://www.facebook.com/info.mwlabs/",
+        "https://youtube.com/@mw_labs",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}#website`,
+      url: siteUrl.toString(),
+      name: "M&W Labs",
+      publisher: { "@id": `${siteUrl}#organization` },
+      inLanguage: "en",
+    },
+    {
+      "@type": "WebPage",
+      "@id": `${siteUrl}#homepage`,
+      url: siteUrl.toString(),
+      name: "M&W Labs — Build. Market. Automate. Grow.",
+      description: "M&W Labs builds websites, software, brands, campaigns, content, and AI automation that drive measurable growth.",
+      isPartOf: { "@id": `${siteUrl}#website` },
+      about: { "@id": `${siteUrl}#organization` },
+      inLanguage: "en",
+    },
+    ...services.map((service) => ({
+      "@type": "Service",
+      name: service.title,
+      description: service.copy,
+      provider: { "@id": `${siteUrl}#organization` },
+      url: `${siteUrl}#services`,
+    })),
+  ],
+};
 
 const benefits = [
   "Result-driven strategies that bring real business growth",
@@ -87,6 +142,7 @@ export default async function MarketingPage() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(homepageJsonLd).replace(/</g, "\\u003c") }} />
       <MarketingHero />
 
       <section id="about" className="scroll-mt-28 bg-white py-14 sm:py-20">

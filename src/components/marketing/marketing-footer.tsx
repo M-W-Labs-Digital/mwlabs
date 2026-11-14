@@ -46,7 +46,7 @@ const footerGroups = [
       { label: "Agency Login", href: "/sign-in" },
       { label: "Register a Project", href: "/register" },
       { label: "Client Stories", href: "/#testimonials" },
-      { label: "Contact", href: "/#contact-details" },
+      { label: "Contact", href: "/contact" },
     ],
   },
 ];
@@ -154,7 +154,7 @@ export function MarketingFooter() {
 
         <div className="flex flex-col gap-4 pt-6 text-[0.6rem] font-bold uppercase tracking-[0.14em] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 M&amp;W Labs · Built locally · All rights reserved</p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2"><Link href="/sign-in" className="transition hover:text-slate-300">Private workspace</Link><Link href="/#top" className="inline-flex items-center text-slate-400 transition hover:text-cyan-300">Return to top <ArrowUp className="ml-2 size-3.5" /></Link></div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2"><Link href="/terms" className="transition hover:text-slate-300">Terms</Link><Link href="/sign-in" className="transition hover:text-slate-300">Private workspace</Link><Link href="/#top" className="inline-flex items-center text-slate-400 transition hover:text-cyan-300">Return to top <ArrowUp className="ml-2 size-3.5" /></Link></div>
         </div>
       </div>
     </footer>

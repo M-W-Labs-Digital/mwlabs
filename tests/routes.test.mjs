@@ -35,6 +35,52 @@ test('SEO slugs reserve every root route and metadata endpoint', async () => {
   for (const slug of ['robots.txt', 'sitemap.xml', '_next']) assert.ok(reservedPageSlugs.has(slug));
 });
 
+test('homepage publishes agent discovery signals and linked legal pages', async () => {
+  const [robots, llms, homepage, footer, contact, terms] = await Promise.all([
+    read('public/robots.txt'), read('public/llms.txt'), read('src/app/(marketing)/page.tsx'),
+    read('src/components/marketing/marketing-footer.tsx'), read('src/app/(marketing)/contact/page.tsx'),
+    read('src/app/(marketing)/terms/page.tsx'),
+  ]);
+  assert.match(robots, /^Content-Signal: search=yes, ai-train=no$/m);
+  assert.match(llms, /^# M&W Labs$/m);
+  assert.match(homepage, /alternates: \{ canonical: "\/" \}/);
+  assert.match(homepage, /application\/ld\+json/);
+  assert.match(homepage, /"@type": "Organization"/);
+  assert.match(homepage, /sameAs:/);
+  assert.match(homepage, /"@type": "WebSite"/);
+  assert.match(homepage, /"@type": "WebPage"/);
+  assert.match(homepage, /"@type": "Service"/);
+  assert.match(footer, /href: "\/contact"/);
+  assert.match(footer, /href="\/terms"/);
+  assert.match(contact, /hello@mwlabs\.digital/);
+  assert.match(terms, /Terms of Service/);
+});
+
+test('MCP server card and endpoint expose only public information', async () => {
+  const responseStub = 'const NextResponse = { json: (body, init) => Response.json(body, init) };';
+  const cardSource = (await read('src/app/.well-known/mcp/server-card.json/route.ts'))
+    .replace(/^import .*;\n/gm, '');
+  const cardModule = await load(`${responseStub}\n${cardSource}`);
+  const card = await (await cardModule.GET()).json();
+  assert.equal(card.endpoint, 'https://mwlabs.digital/api/mcp');
+  assert.equal(card.capabilities.tools.listChanged, false);
+
+  const mcpSource = (await read('src/app/api/mcp/route.ts')).replace(/^import .*;\n/gm, '');
+  const mcpModule = await load(`${responseStub}\n${mcpSource}`);
+  const post = (body) => mcpModule.POST(new Request('https://mwlabs.digital/api/mcp', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  }));
+  const initialized = await (await post({ jsonrpc: '2.0', id: 1, method: 'initialize' })).json();
+  assert.equal(initialized.result.serverInfo.name, 'mwlabs-public-info');
+  const listed = await (await post({ jsonrpc: '2.0', id: 2, method: 'tools/list' })).json();
+  assert.equal(listed.result.tools[0].name, 'get_mw_labs_public_info');
+  const called = await (await post({
+    jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'get_mw_labs_public_info' },
+  })).json();
+  assert.match(called.result.content[0].text, /hello@mwlabs\.digital/);
+  assert.equal(called.result.structuredContent.name, 'M&W Labs');
+});
+
 test('homepage fragment links resolve to real targets', async () => {
   const files = ['src/app/(marketing)/page.tsx', 'src/app/layout.tsx',
     'src/components/marketing/marketing-header.tsx', 'src/components/marketing/marketing-footer.tsx',

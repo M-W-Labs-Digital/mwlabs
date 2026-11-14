@@ -5,6 +5,41 @@ import { authCookiePrefix, safePostAuthPath } from "@/lib/auth-shared";
 import { getAuthConfig } from "@/lib/auth-config";
 
 export function proxy(request: NextRequest) {
+  if (
+    request.nextUrl.pathname === "/" &&
+    request.headers.get("accept")?.includes("text/markdown")
+  ) {
+    return new NextResponse(
+      [
+        "# M&W Labs",
+        "",
+        "M&W Labs is an independent digital studio in Dhaka, Bangladesh, working with founders and teams worldwide.",
+        "",
+        "We build websites, software, brands, marketing campaigns, content, AI automation, and growth systems.",
+        "",
+        "## Contact",
+        "- Email: hello@mwlabs.digital",
+        "- Phone: +44 20 3769 7100",
+        "- Location: Demra, Dhaka, Bangladesh",
+        "",
+        "## Key pages",
+        "- [About](https://mwlabs.digital/#about)",
+        "- [Services](https://mwlabs.digital/#services)",
+        "- [Work](https://mwlabs.digital/work)",
+        "- [Insights](https://mwlabs.digital/blog)",
+        "- [Book a call](https://mwlabs.digital/book)",
+        "- [Contact](https://mwlabs.digital/contact)",
+        "- [Terms](https://mwlabs.digital/terms)",
+      ].join("\n"),
+      {
+        headers: {
+          "Content-Type": "text/markdown; charset=utf-8",
+          Vary: "Accept",
+        },
+      },
+    );
+  }
+
   const sessionCookie = getSessionCookie(request, {
     cookiePrefix: authCookiePrefix,
   });
@@ -19,5 +54,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/portal/:path*"],
+  matcher: ["/", "/app/:path*", "/portal/:path*"],
 };

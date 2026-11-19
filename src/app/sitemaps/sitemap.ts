@@ -6,6 +6,7 @@ import { getSitemapContent, getSitemapCounts, siteUrl } from "@/lib/public-conte
 
 export const dynamic = "force-dynamic";
 
+// Keep generated segments separate from the public /sitemap.xml index route.
 const sitemapSize = 45_000;
 const recoverablePrismaCodes = new Set(["P1001", "P1003", "P2021", "P2022"]);
 const staticRoutes = [

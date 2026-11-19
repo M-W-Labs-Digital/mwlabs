@@ -40,6 +40,10 @@ export function proxy(request: NextRequest) {
     );
   }
 
+  // The homepage also matches this proxy for Markdown content negotiation,
+  // but remains public for normal browser requests.
+  if (request.nextUrl.pathname === "/") return NextResponse.next();
+
   const sessionCookie = getSessionCookie(request, {
     cookiePrefix: authCookiePrefix,
   });

@@ -133,5 +133,5 @@ test('sitemap index lists every generated segment with escaped absolute URLs', a
   assert.equal(response.headers.get('content-type'), 'application/xml; charset=utf-8');
   const xml = await response.text();
   assert.ok(xml.includes('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'));
-  for (const id of [0, 1]) assert.ok(xml.includes(`<loc>https://example.com/sitemap/${id}.xml</loc>`));
+  for (const id of [0, 1]) assert.ok(xml.includes(`<loc>https://example.com/sitemaps/sitemap/${id}.xml</loc>`));
 });

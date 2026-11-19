@@ -99,6 +99,17 @@ test('proxy sends unauthenticated production requests to the public login with t
   const previous = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   try {
+    for (const accept of ['text/html', '*/*']) {
+      const homepage = proxy(new NextRequest('http://localhost:3000/', { headers: { accept } }));
+      assert.equal(homepage.headers.get('location'), null);
+      assert.equal(homepage.headers.get('x-middleware-next'), '1');
+    }
+    const markdown = proxy(new NextRequest('http://localhost:3000/', { headers: { accept: 'text/markdown' } }));
+    assert.equal(markdown.status, 200);
+    assert.equal(markdown.headers.get('content-type'), 'text/markdown; charset=utf-8');
+    assert.match(await markdown.text(), /^# M&W Labs/);
+    const portal = proxy(new NextRequest('http://localhost:3000/portal'));
+    assert.equal(new URL(portal.headers.get('location')).pathname, '/sign-in');
     const response = proxy(new NextRequest('http://localhost:3000/app/tasks?view=mine'));
     const destination = new URL(response.headers.get('location'));
     assert.equal(destination.origin, 'https://mwlabs.digital');

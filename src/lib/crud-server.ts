@@ -58,7 +58,7 @@ const contentResources = new Set(["blog-posts", "work-posts", "seo-pages"]);
 const reservedPageSlugs = new Set([
   "app", "api", "auth", "blog", "book", "contact", "forgot-password", "invite", "media",
   "portal", "register", "reset-password", "robots.txt", "sign-in", "sign-up", "terms",
-  "sitemap", "sitemap.xml", "work", "_next",
+  "sitemap", "sitemap.xml", "sitemaps", "work", "_next",
 ]);
 const searchFields: Record<string, string[]> = {
   leads: ["name", "company", "email", "phone", "source", "stage", "ownerName"],
